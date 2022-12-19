@@ -469,7 +469,8 @@ After build ran successful, push this image to your DockerHub repo, in my case:
 
 ```$ docker push vitorcmonteiro/article-03-node-replicas```
 
-[docker push]
+![Docker push to Docker Hub](https://user-images.githubusercontent.com/22838513/208545954-33dbac92-e308-49ae-a181-3d96f6268570.png)
+
 
 #### **Configure MongoDB Helm Chart and Create Deployment**
 For this step we will take advantage of the templating mentioned before. We must create a file called ``mongodb-values.yaml`` that will serve as the values that will be inserted into the Helm Chart template.
@@ -478,7 +479,8 @@ First, we create a key for the ReplicaSet:
 
 ```$ openssl rand -base64 756 > key.txt``` and add that to the cluster like we did with the secret ```$ kubectl create secret generic keyfilesecret --from-file=key.txt```. Since we already created MongoDB's secret for admin access, we will have two secrets.
 
-[secrets]
+![Secrets saved in Cluster](https://user-images.githubusercontent.com/22838513/208545996-3fa01317-5166-45d1-bf95-c52b8352a0bb.png)
+
 
 After that we can create the ``mongodb-values.yaml`` file. This file is needed in order to configure the Helm package we are installing and acts as a template.
 
@@ -499,11 +501,11 @@ Now we will install MongoDB using Helm (instead of creating all files like we di
 ```$ helm repo list```<br>
 ```$ helm install mongodb -f mongodb-values.yaml mongodb/mongodb```
 
-[helm deploy]
+![Helm installation](https://user-images.githubusercontent.com/22838513/208546022-55175695-69f6-4e01-b4c4-d7b72f4c735a.png)
 
 Just by running these commands we will have a running pod named helm-mongodb, check that by running ``$ kubectl get pod``:
 
-[helm mongo-db]
+![Pods running](https://user-images.githubusercontent.com/22838513/208546072-2ab23b28-1883-4853-b009-fe3d27d88d56.png)
 
 Now that the pods are running, we have a MongoDB installed and running in multiple instances. Next up we are going to create our own Helm package instead of using a Bitnami's or someone elese's repository.
 
@@ -581,7 +583,8 @@ data:
 ### **Article 04 - Envoy**
 Envoy is a type of load balancing technology created at Lyft. There are several other options like NGINX, HAProxy, Zuul, Linkerd, Traefik, and Caddy (Go) [^8]. It's important to note that depending on the engine used in the cloud service this tutorial may not work.
 
-[arch]
+![Envoy architecture](https://user-images.githubusercontent.com/22838513/208545915-ed3fa0f8-92f1-4a31-981c-33445271bc33.png)
+
 
 #### **Create headless service**
 
@@ -608,8 +611,7 @@ spec:
 
 #### **Test if it's working**
 
-
-[port-forwarding]
+![port-forwarding](https://user-images.githubusercontent.com/22838513/208545387-d32cd6ee-062a-40e3-9a02-c387109ed784.png)
 
 #### **Create Grafana Deployment, Service, and PVC**
 To deploy Grafana to our solution is quite straightforward and repeats what we have done before. We will create a Deployment, a Service, and a PVC (Remember, we have data to be persisted right now). I used Grafana's own documentation for that[^10]. Since all three components need each other for Grafana to work, let's just create one file.
