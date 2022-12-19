@@ -1,0 +1,7 @@
+architecture: replicaset
+replicaCount: 3
+persistence:
+  size: 1Gi
+auth:
+  rootUser: gra_admin
+  rootPassword: password
