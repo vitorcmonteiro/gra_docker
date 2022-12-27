@@ -1,19 +1,10 @@
 {
-  "name": "nodejs-image-demo",
-  "version": "1.0.0",
-  "description": "nodejs image demo",
-  "author": "katjuell <kathleenjuell@gmail.com>",
+  "name": "gra_nodejs_sharks",
+  "version": "1.1.0",
+  "description": "forked image of https://github.com/katjuell/nodejs-image-demo.git. Credits to katjuell <kathleenjuell@gmail.com>.",
+  "author": "Vitor Monteiro <vitorcmonteiro@outlook.com>",
   "license": "MIT",
   "main": "app.js",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/katjuell/nodejs-image-demo.git"
-  },
-  "keywords": [
-    "nodejs",
-    "bootstrap",
-    "express"
-  ],
   "dependencies": {
     "ejs": "^2.6.1",
     "express": "^4.16.4",

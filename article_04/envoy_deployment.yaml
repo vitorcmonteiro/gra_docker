@@ -32,7 +32,7 @@ spec:
       containers:
       - name: myapp-envoy
         image: vitorcmonteiro/myapp-envoy:1
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - name: http
           containerPort: 80

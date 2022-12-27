@@ -7,9 +7,9 @@
   1.5. [Kubernetes in Practice](#kubernetes-in-practice)<br>
     1.5.1. [Development Environment](#development-environment)<br>
     1.5.2. [Article 01 - Persisting Data In Kubernetes](#article-01---persisting-data-in-kubernetes)<br>
-    1.5.3. [Article 02 - How data "travels" between Pods](#article-2---how-data-travels-between-pods)<br>
-    1.5.4. [Article 03 - Helm](#article-3---helm)<br>
-    1.5.5. [Article 04 - Envoy](#article-4---envoy)<br>
+    1.5.3. [Article 02 - How data "travels" between Pods](#article-02---how-data-travels-between-pods)<br>
+    1.5.4. [Article 03 - Helm](#article-03---helm)<br>
+    1.5.5. [Article 04 - Envoy](#article-04---envoy)<br>
 2. [References](#references)<br>
   2.1. [Docker](#docker)<br>
   2.2. [Kubernetes](#kubernetes)<br>
@@ -380,18 +380,33 @@ With the database created, let's restart the pod. There's no official way to do 
 </br>
 
 ### **Article 02 - How data "travels" between containers inside a pod**
-This topic is a bit more complex and not that "useful" - lack of a better word. This will require monitoring the network for packages and is very specific to debug some solutions.
+This topic is a bit more complex and not that "useful" - lack of a better word. This will require monitoring the network for packages and is very specific to debug some solutions. We will utilize two images: Nginx and Busybox. Our deployment will have two containers. In article 01 we had one container per deployment.
 
+```yaml
+# nginx-bisybox.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-busybox
+spec:
+  containers:
+  - command:
+    - sleep
+    - infinity
+    image: busybox
+    name: busybox
+  - image: nginx
+    name: nginx
+```
 
+?? I found articles talking about two kuberenetes nodes, not within one particular node (Above doesn't necessarily show packets, just processes)
 
-[namespace]
-
-https://www.redhat.com/sysadmin/kubernetes-pod-network-communications
 https://www.redhat.com/sysadmin/kubernetes-pods-communicate-nodes
 
+<br>
 
 ### **Article 03 - Helm**
-Helm is a package manager for Kubernetes, much like the apt command in Linux. Instead of developing abunch of YAML files for all applications, other developers bundle them up into Helm Charts so that we can download it and use in our applications more quickly.
+Helm is a package manager for Kubernetes, much like the apt command in Linux. Instead of developing abunch of YAML files for all applications, other developers bundle them up into Helm Charts so that we can download it and use in our applications quicker. You can also think of it as Docker Hub or PyPi and their packages.
 
 It can also work as a template engine, so that we will have templates and within these template YAML files we can change the placeholders "on the fly" which is a great feature when we have a Continuous Development scenario.
 
@@ -409,16 +424,31 @@ Run ``$ helm`` command to confirm that it was installed. If it was successful, w
 
 We will build a Node.js application with MongoDB through Helm. This will also enable us to see persistance and replication of data. This article[^7] was used to develop this section, which was very helpful to understand how to verify if data was replicated throughout database instances.
 
-##### **Cloning Application**
-The following command will clone the application repository to a folder called ``article_03``. It will pull all the required files including those needed to create Helm Charts.
+1. [Clone Node Application](#clone-node-application)
+2. [Preparing Node Application Docker Image](#preparing-node-application-docker-image)
+3. [Implement MongoDB using Helm](#implement-mongodb-using-helm)
+4. [Create Node.js App with personalized Helm chart](#create-nodejs-app-with-personalized-helm-chart)
+
+<br>
+
+#### **Clone Node Application**
+The following command will clone the application repository to a folder called ``article_03``. This application contains a simple web app that gather two strings and store it in MongoDB. We will package it in a Docker image that will be used later on when scaling up our Node.js application.
 
 ```$ git clone https://github.com/do-community/node-mongo-docker-dev.git article_03```
 
-This Helm Chart will create:
-* A StatefulSet object with three Pods, this is our distributed and failproof database.
-* MongoDB replica with one master and two secondary pods. Data is stored in the first and replicated to the secondary pods.
+There will be a lot of files in this project. We won't use every single one of them, I will slowly change them as needed. These changes are mostly related to newer versions becoming available and requiring us to adapt our code.
 
-To make the connection between MongoDB pods, MongoDB uses a URI with all connection information. Currently, the file ``db.js`` contains constants and wouldn't allow us to have multiple replicas. Add the following to ```db.js```.
+<br>
+
+#### **Preparing Node Application Docker Image**
+
+To make the connection between MongoDB pods, MongoDB uses a URI with all connection information. Currently, the file ``db.js`` stores that URI and we need to do minor changes to comply with newer versions. 
+
+* Edit ``db.js``;
+* Delete ``package-lock.json`` file;
+* Edit ``Dockerfile``.
+
+Add the following to ```db.js```:
 
 ```javascript
 // db.js
@@ -427,22 +457,21 @@ const {
   MONGO_USERNAME,
   MONGO_PASSWORD,
   MONGO_HOSTNAME,
-  MONGO_PORT,
   MONGO_DB,
-  MONGO_REPLICASET // Add this
+  MONGO_REPLICASET // Add this and remove MONGO_PORT
 } = process.env;
 
 ...
-const url = `mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOSTNAME}:${MONGO_PORT}/${MONGO_DB}?replicaSet=${MONGO_REPLICASET}&authSource=admin`; // Edit this connection string
+const url = `mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOSTNAME}/${MONGO_DB}?replicaSet=${MONGO_REPLICASET}&authSource=admin`; // Edit this connection string
 ...
 ```
 
-We added ``MONGO_REPLICASET`` constant to the ``process.env`` variable and to the connection string (``url``). With this we will pass the Replica address alongside the other parameters.
+We added ``MONGO_REPLICASET`` constant to the ``process.env`` variable and to the connection constant (``url``). With this we will pass the Replica address alongside the other parameters. We don't need ``MONGO_PORT`` anymore as the URI style changed.
 
-Before we build a Docker image, delete ```package-lock.json``` and change the Dockerfile first line:
+Before we build a Docker image, delete ```package-lock.json``` and change the the first line of the Dockerfile:
 
 ```Dockerfile
-FROM node:18.12.1-alpine
+FROM node:19.3.0 # Edit this image version
 
 RUN mkdir -p /home/node/app/node_modules && chown -R node:node /home/node/app
 
@@ -469,16 +498,16 @@ After build ran successful, push this image to your DockerHub repo, in my case:
 
 ```$ docker push vitorcmonteiro/article-03-node-replicas```
 
-[docker push]
+<br>
 
-#### **Configure MongoDB Helm Chart and Create Deployment**
-For this step we will take advantage of the templating mentioned before. We must create a file called ``mongodb-values.yaml`` that will serve as the values that will be inserted into the Helm Chart template.
+#### **Implement MongoDB using Helm**
+For this step we will take advantage of Helm's templating. We must create a file called ``mongodb-values.yaml`` in the root folder and that file will serve as the values that will be inserted into the Helm Chart template when it creates the Deployments.
+
+To acomplish this we will use [Bitnami's image](https://artifacthub.io/packages/helm/bitnami/mongodb) as it is still being updated and is fairly famous. We are going to create a cluster of the [ReplicaSet (StatefulSet)](https://www.mongodb.com/docs/kubernetes-operator/master/tutorial/mdb-resources-arch/#replica-set) type. The pods interact with a headless service (No particular deployment associated) and that will require us to create a secret that will be shared by any additional pod we create.
 
 First, we create a key for the ReplicaSet:
 
 ```$ openssl rand -base64 756 > key.txt``` and add that to the cluster like we did with the secret ```$ kubectl create secret generic keyfilesecret --from-file=key.txt```. Since we already created MongoDB's secret for admin access, we will have two secrets.
-
-[secrets]
 
 After that we can create the ``mongodb-values.yaml`` file. This file is needed in order to configure the Helm package we are installing and acts as a template.
 
@@ -488,15 +517,16 @@ architecture: replicaset
 replicaCount: 3
 persistence:
   size: 1Gi
-replicaSetName: db
 auth:
+  rootUser: gra_admin
+  rootPassword: "password"
   existingKeySecret: keyfilesecret
-  existingAdminSecret: mongodb-secret
 ```
+By default, this MongoDB chart uses a standalone approach (1 pod, centralized). Thus we added the architecture key and set it to replicaset. Then we set the number of pods (scale of our database), the size of each volume, and the authentication information.
+
 Now we will install MongoDB using Helm (instead of creating all files like we did in article 01):
 
 ```$ helm repo add mongodb https://charts.bitnami.com/bitnami```<br>
-```$ helm repo list```<br>
 ```$ helm install mongodb -f mongodb-values.yaml mongodb/mongodb```
 
 [helm deploy]
@@ -507,7 +537,9 @@ Just by running these commands we will have a running pod named helm-mongodb, ch
 
 Now that the pods are running, we have a MongoDB installed and running in multiple instances. Next up we are going to create our own Helm package instead of using a Bitnami's or someone elese's repository.
 
-#### **Creating Custom Application Chart and Parameters**
+<br>
+
+#### **Create Node.js App with personalized Helm chart**
 At the root level of the project, create a new Helm repository:
 
 ```$ helm create nodeapp```
@@ -527,12 +559,12 @@ First we will edit values.yaml to match the image we created at the first step.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-replicaCount: 3 # Here
+replicaCount: 3
 
 image:
-  repository: vitorcmonteiro/node-replicas # Here
-  tag: latest # Here
-  pullPolicy: IfNotPresent
+  repository: vitorcmonteiro/article-03-node-replicas
+  tag: latest
+  pullPolicy: Always
 
 nameOverride: ""
 fullnameOverride: ""
@@ -545,8 +577,6 @@ service:
 ```
 
 Why are we doing this? Well, remember that the first step consisted in creating an image that would pull Node.js image and run it as a web-server (Take a look at the Dockerfile). So every time we want to increase the replica amount, it will run that image and launch a pod (container) in minikube.
-
-What's very interesting and concerning is that many application nowadays are currently pointing to someone's github as their helm repository and this could potentially break apps all around the globe if that person decides to delete that repo.
 
 Now create a file called ``secret.yaml`` in the ``templates`` folder and insert the following:
 
@@ -561,7 +591,7 @@ data:
   MONGO_PASSWORD: cGFzc3dvcmQ
 ```
 
-The USERNAME and PASSWORD came from the very first secret file we created, base64-encoded. This secret will replicate for each Node pod that Kubernet launches, guaranteeing that all instances have access to the database. Remember that there's another component called ConfigMap where we stored all variables for each deployment.
+MONGO_USERNAME and MONGO_PASSWORD came from the very first secret file we created (article 01) and it's base64-encoded. This secret will replicate for each Node pod that Kubernet launches, guaranteeing that all instances have access to the database using these credentials. Remember that there's another component called ConfigMap where we stored all variables for each deployment.
 
 Create a ``configmap.yaml`` file inside the ``templates`` folder and add the following:
 
@@ -572,14 +602,84 @@ kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-config
 data:
-  MONGO_HOSTNAME: "mongo-mongodb-replicaset-0.mongo-mongodb-replicaset.default.svc.cluster.local,mongo-mongodb-replicaset-1.mongo-mongodb-replicaset.default.svc.cluster.local,mongo-mongodb-replicaset-2.mongo-mongodb-replicaset.default.svc.cluster.local"  
+  MONGO_HOSTNAME: "mongodb-0.mongodb-headless.default.svc.cluster.local:27017,mongodb-1.mongodb-headless.default.svc.cluster.local:27017,mongodb-2.mongodb-headless.default.svc.cluster.local:27017"  
   MONGO_PORT: "27017"
   MONGO_DB: "sharkinfo"
-  MONGO_REPLICASET: "db"
+  MONGO_REPLICASET: "rs0"
 ```
+
+Hostname depends on the name of your pods. That means it's a good idea to first ```$ kubectl get pods``` and see mongodb pods names and then add them in Configmap. They are usually named like this: ```$(statefulset-name)-$(ordinal).$(service name).$(namespace).svc.cluster.local```. Since we have a headless service that will proxy queries to each pod, you see mongodb-headless in all addresses.
+
+I think this solution is very limited because what happens if we add another instance of MongoDB? I couldn't figure out and didn't want to spend too much time on it but I believe it is possible.
+
+Now we have to work on ```deployment.yaml``` file which will iteratively run deploying our web application as many times as we need. Right below the key named ```imagePullPolicy```, let's create a ```env``` key:
+
+```yaml
+# deployment.yaml
+          env:
+          - name: MONGO_USERNAME
+            valueFrom:
+              secretKeyRef:
+                key: MONGO_USERNAME
+                name: {{ .Release.Name }}-auth
+          - name: MONGO_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: MONGO_PASSWORD
+                name: {{ .Release.Name }}-auth
+          - name: MONGO_HOSTNAME
+            valueFrom:
+              configMapKeyRef:
+                key: MONGO_HOSTNAME
+                name: {{ .Release.Name }}-config
+          - name: MONGO_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: MONGO_PORT
+                name: {{ .Release.Name }}-config
+          - name: MONGO_DB
+            valueFrom:
+              configMapKeyRef:
+                key: MONGO_DB
+                name: {{ .Release.Name }}-config      
+          - name: MONGO_REPLICASET
+            valueFrom:
+              configMapKeyRef:
+                key: MONGO_REPLICASET
+                name: {{ .Release.Name }}-config
+...
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /sharks # Here
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /sharks # Here
+              port: http
+...
+```
+
+These variables will be injected into each Node.js pod and will be used by ```db.js``` to connect to MongoDB service who will proxy the query to one of MongoDB's pods. Now we can install/deploy it:
+
+```$ helm install nodejs ./nodeapp```
+
+<br>
+
+#### **Open port to local machine and test**
+After confirming that all pods are running, open Node.js service port and access it in the browser:
+
+```$ minikube service nodejs-nodeapp```
+
+Add some sharks and see that the results add up when you add a new one. Even if we stop minikube entirely we would persist our data accross all pods.
 
 ### **Article 04 - Envoy**
 Envoy is a type of load balancing technology created at Lyft. There are several other options like NGINX, HAProxy, Zuul, Linkerd, Traefik, and Caddy (Go) [^8]. It's important to note that depending on the engine used in the cloud service this tutorial may not work.
+
+1. [Create headless service](#create-headless-service)
 
 [arch]
 
@@ -755,3 +855,8 @@ https://docs.docker.com/desktop/install/ubuntu/<br>
 ## Others
 
 https://github.com/bitnami/charts/tree/main/bitnami/mongodb<br>
+https://www.getambassador.io/resources/ambassador-prometheus<br>
+https://blog.opstree.com/2022/10/04/prometheus-and-grafana-on-kubernetes/<br>
+https://blog.markvincze.com/how-to-use-envoy-as-a-load-balancer-in-kubernetes/<br>
+https://www.redhat.com/sysadmin/kubernetes-pod-network-communications<br>
+https://www.redhat.com/sysadmin/kubernetes-pods-communicate-nodes<br>

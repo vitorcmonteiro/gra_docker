@@ -4,4 +4,5 @@ persistence:
   size: 1Gi
 auth:
   rootUser: gra_admin
-  rootPassword: password
+  rootPassword: "password"
+  existingKeySecret: keyfilesecret
