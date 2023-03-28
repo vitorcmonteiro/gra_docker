@@ -4,6 +4,8 @@
 
 replicaCount: 3
 
+# TODO: Explain that we could pass values through values.yaml or configmap
+
 image:
   repository: vitorcmonteiro/article-03-node-replicas
   pullPolicy: Always

@@ -538,6 +538,8 @@ Just by running these commands we will have a running pod named helm-mongodb, ch
 
 Now that the pods are running, we have a MongoDB installed and running in multiple instances. Next up we are going to create our own Helm package instead of using a Bitnami's or someone elese's repository.
 
+TODO: Quick explanation of linking between PV and PVCs
+
 <br>
 
 #### **Create Node.js App with personalized Helm chart**
@@ -680,10 +682,27 @@ Add some sharks and see that the results add up when you add a new one. Even if 
 ### **Article 04 - Envoy**
 Envoy is a type of load balancing technology created at Lyft. There are several other options like NGINX, HAProxy, Zuul, Linkerd, Traefik, and Caddy (Go) [^8]. It's important to note that depending on the engine used in the cloud service this tutorial may not work.
 
+* Used as a networking map, connecting the dots between ingress and services;
+* Treat incoming requests and adapts it to match underlying API's requirements, integrating them into one single app;
+
+The following diagram is important to understand where the requests may come from:
+
+![Envoy architecture](https://user-images.g ithubusercontent.com/22838513/208545915-ed3fa0f8-92f1-4a31-981c-33445271bc33.png)
+
+Remember that pods themselves are not open to the world. That's one of the strengths of Kubernetes (and Minikube). To connect from the outside we must use one of the two types of objects: [LoadBalancer](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/) or [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/).
+
+In addition, we must have an Ingress Controller and this is not enabled by default in Minikube. The Ingress object defines rules, while the controller handles/fulfills these rules. In Minikube's case, we may enable this addon by using the following command[^9]:
+
+```$ minikube addons enable ingress```
+
+This will create a few NGINX pods that will handle Ingress objects.
+
+
 1. [Create headless service](#create-headless-service)
+A headless service won't provide an IP to connect to, it will function as a DNS server that will "balance" traffic to each underlying pod that will actually contain their own IP address.
 
-![Envoy architecture](https://user-images.githubusercontent.com/22838513/208545915-ed3fa0f8-92f1-4a31-981c-33445271bc33.png)
 
+<br>
 
 #### **Create headless service**
 
@@ -709,7 +728,7 @@ spec:
 #### **Create Envoy Deployment**
 
 #### **Test if it's working**
-
+ 
 ![port-forwarding](https://user-images.githubusercontent.com/22838513/208545387-d32cd6ee-062a-40e3-9a02-c387109ed784.png)
 
 #### **Create Grafana Deployment, Service, and PVC**
@@ -838,6 +857,7 @@ https://docs.docker.com/samples/<br>
 [^6]: [How To Deploy MongoDB on Kubernetes – Beginners Guide](https://devopscube.com/deploy-mongodb-kubernetes/)<br>
 [^7]: [How To Scale a Node.js Application with MongoDB on Kubernetes Using Helm](https://www.digitalocean.com/community/tutorials/how-to-scale-a-node-js-application-with-mongodb-on-kubernetes-using-helm)<br>
 [^8]: [How to use Envoy as a Load Balancer in Kubernetes](https://blog.markvincze.com/how-to-use-envoy-as-a-load-balancer-in-kubernetes/)<br>
+[^9]: [Set up Ingress on Minikube with the NGINX Ingress Controller](https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/)<br>
 [^9]: [Envoy 1.24.1 Documentation](https://www.envoyproxy.io/docs/envoy/v1.24.1/)<br>
 [^10]: [Installing Grafana in Kubernetes](https://grafana.com/docs/grafana/latest/setup-grafana/installation/kubernetes/)<br>
 
@@ -852,6 +872,8 @@ https://loft.sh/blog/kubernetes-statefulset-examples-and-best-practices/<br>
 https://devopscube.com/setup-prometheus-monitoring-on-kubernetes/#:~:text=Prometheus%20is%20a%20high%2Dscalable,helps%20with%20metrics%20and%20alerts.<br>
 https://docker-curriculum.com/<br>
 https://docs.docker.com/desktop/install/ubuntu/<br>
+https://www.youtube.com/watch?v=E-UpGmj6B9M<br>
+https://www.sobyte.net/post/2021-11/envoy-usage-demo/<br>
 
 ## Others
 

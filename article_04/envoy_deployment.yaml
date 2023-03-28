@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: myapp-envoy
+  name: envoy-pod-service
   labels:
     app: myapp-envoy
 spec:
@@ -17,10 +17,11 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: myapp-envoy
+  name: envoy-pod
   labels:
     app: myapp-envoy
 spec:
+  replicas: 2
   selector:
     matchLabels:
       app: myapp-envoy
@@ -31,10 +32,17 @@ spec:
     spec:
       containers:
       - name: myapp-envoy
-        image: vitorcmonteiro/myapp-envoy:1
+        image: vitorcmonteiro/article-04_envoy:1
+        resources:
+            limits:
+              cpu: 200m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
         imagePullPolicy: Always
         ports:
         - name: http
-          containerPort: 80
+          containerPort: 8080
         - name: envoy-admin
           containerPort: 9901

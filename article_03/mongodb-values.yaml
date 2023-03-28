@@ -6,3 +6,5 @@ auth:
   rootUser: gra_admin
   rootPassword: "password"
   existingKeySecret: keyfilesecret
+
+  # TOOD: Could use root pass and user in command line
