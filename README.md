@@ -78,8 +78,6 @@ The Dev Container extension enables us to "develop in production". By that I mea
 ### **Article 01 - Persisting Data In Kubernetes**
 In this article we will try to show how to persist data in a Kubernetes cluster. I will cover steps to create a MongoDB cluster with and without a Stateful component so that we can reset both instances and we will see what happens with the data we created. 
 
-<br>
-
 #### **Setup MongoDB deployment & service components**
 First we need to setup the actual application by creating a Deployment and Service components. Using VSCode there's a feature that allows us to choose what component we are creating and then it creates the whole template file for you.
 
@@ -670,14 +668,13 @@ These variables will be injected into each Node.js pod and will be used by ```db
 
 ```$ helm install nodejs ./nodeapp```
 
-<br>
-
 #### **Open port to local machine and test**
 After confirming that all pods are running, open Node.js service port and access it in the browser:
 
 ```$ minikube service nodejs-nodeapp```
 
 Add some sharks and see that the results add up when you add a new one. Even if we stop minikube entirely we would persist our data accross all pods.
+<br>
 
 ### **Article 04 - Envoy**
 Envoy is a type of load balancing technology created at Lyft. There are several other options like NGINX, HAProxy, Zuul, Linkerd, Traefik, and Caddy (Go) [^8]. It's important to note that depending on the engine used in the cloud service this tutorial may not work.
@@ -687,7 +684,7 @@ Envoy is a type of load balancing technology created at Lyft. There are several 
 
 The following diagram is important to understand where the requests may come from:
 
-![Envoy architecture](https://user-images.g ithubusercontent.com/22838513/208545915-ed3fa0f8-92f1-4a31-981c-33445271bc33.png)
+![Envoy architecture](https://user-images.githubusercontent.com/22838513/208545915-ed3fa0f8-92f1-4a31-981c-33445271bc33.png)
 
 Remember that pods themselves are not open to the world. That's one of the strengths of Kubernetes (and Minikube). To connect from the outside we must use one of the two types of objects: [LoadBalancer](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/) or [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/).
 
@@ -883,3 +880,6 @@ https://blog.opstree.com/2022/10/04/prometheus-and-grafana-on-kubernetes/<br>
 https://blog.markvincze.com/how-to-use-envoy-as-a-load-balancer-in-kubernetes/<br>
 https://www.redhat.com/sysadmin/kubernetes-pod-network-communications<br>
 https://www.redhat.com/sysadmin/kubernetes-pods-communicate-nodes<br>
+
+https://observability.thomasriley.co.uk/prometheus/deploying-prometheus/launch-prometheus-instance/
+https://docs.openshift.com/container-platform/3.11/rest_api/rbac_authorization_k8s_io/clusterrole-rbac-authorization-k8s-io-v1.html#clusterrole-rbac-authorization-k8s-io-v1
