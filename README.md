@@ -677,163 +677,139 @@ Add some sharks and see that the results add up when you add a new one. Even if 
 <br>
 
 ### **Article 04 - Envoy**
-Envoy is a type of load balancing technology created at Lyft. There are several other options like NGINX, HAProxy, Zuul, Linkerd, Traefik, and Caddy (Go) [^8]. It's important to note that depending on the engine used in the cloud service this tutorial may not work.
+Envoy is a proxy/load balancing technology created at Lyft. There are several other options like NGINX, HAProxy, Zuul, Linkerd, Traefik, and Caddy (Go) [^8]. It's important to note that depending on the engine used in the cloud service this tutorial may not work.
 
+* Enable underlying pods to be accessed externally;
 * Used as a networking map, connecting the dots between ingress and services;
 * Treat incoming requests and adapts it to match underlying API's requirements, integrating them into one single app;
 
-The following diagram is important to understand where the requests may come from:
+Remember that pods themselves are not open to the outside world. That's one of the strengths of Kubernetes (and Minikube). To connect from the outside we must use one of the two types of objects: [LoadBalancer](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/) or [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/).
 
-![Envoy architecture](https://user-images.githubusercontent.com/22838513/208545915-ed3fa0f8-92f1-4a31-981c-33445271bc33.png)
+These steps are based on [this article](https://www.getambassador.io/resources/ambassador-prometheus) and it really helped me setup my Prometheus-Ambassador solution.
 
-Remember that pods themselves are not open to the world. That's one of the strengths of Kubernetes (and Minikube). To connect from the outside we must use one of the two types of objects: [LoadBalancer](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/) or [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/).
+#### **Install required CRDs (Custom Resource Definitions) & Deploy Prometheus Operator**
+First, we need to create something called [Prometheus Operator](https://www.tigera.io/learn/guides/prometheus-monitoring/prometheus-operator/). This operator will manage the Prometheus application and automate all configurations. RBAC is just the short for Role-based access control which is basically creating accounts with certain access levels (Very much what happens with Cloud Services).
 
-In addition, we must have an Ingress Controller and this is not enabled by default in Minikube. The Ingress object defines rules, while the controller handles/fulfills these rules. In Minikube's case, we may enable this addon by using the following command[^9]:
+* Apply CRDs
+``$ kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/bundle.yaml
+``
 
-```$ minikube addons enable ingress```
+* Check if they were created
+* Check if Prometheus is running
 
-This will create a few NGINX pods that will handle Ingress objects.
-
-
-1. [Create headless service](#create-headless-service)
-A headless service won't provide an IP to connect to, it will function as a DNS server that will "balance" traffic to each underlying pod that will actually contain their own IP address.
-
-
-<br>
-
-#### **Create headless service**
+#### **Install RBACs to allow monitoring**
+Now, we need to create accounts that will take the role of monitoring our application:
 
 ```yaml
-# envoy_service.yaml
+# prom-rbac.yaml
 apiVersion: v1
-kind: Service
+kind: ServiceAccount
 metadata:
-  name: myapp
-spec:
-  clusterIP: None
-  ports:
-  - name: http
-    port: 80
-    targetPort: http
-    protocol: TCP
-  selector:
-    app: myapp
+  name: prometheus
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["get"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: default
 ```
 
-#### **Create Envoy Docker Image**
+After creating the above file, apply it to our cluster:</br>
+``$ kubectl apply -f prom-rbac.yaml``
 
-#### **Create Envoy Deployment**
-
-#### **Test if it's working**
- 
-![port-forwarding](https://user-images.githubusercontent.com/22838513/208545387-d32cd6ee-062a-40e3-9a02-c387109ed784.png)
-
-#### **Create Grafana Deployment, Service, and PVC**
-To deploy Grafana to our solution is quite straightforward and repeats what we have done before. We will create a Deployment, a Service, and a PVC (Remember, we have data to be persisted right now). I used Grafana's own documentation for that[^10]. Since all three components need each other for Grafana to work, let's just create one file.
+#### **Deploy Prometheus instance**
+To create a Prometheus deployment we will use the following:
 
 ```yaml
-# grafana.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
+# prometheus.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
 metadata:
-  name: grafana-pvc
+  name: prometheus
 spec:
-  accessModes:
-    - ReadWriteOnce
+  serviceAccountName: prometheus
+  serviceMonitorSelector:
+    matchLabels:
+      ambassador: monitoring
   resources:
     requests:
-      storage: 1Gi
----
-apiVersion: apps/v1
-kind: Deployment
+      memory: 400Mi
+```
+
+Then apply it to the cluster as well:</br>
+```$ kubectl apply -f prometheus.yaml```
+
+Make sure it's running and then port forward the app so we can reach through the browser:</br>
+```$ kubectl port-forward svc/prometheus-operated 9090:9090```
+
+[prometheus-ui]
+
+#### **Configure ServiceMonitor**
+These CRDs are used to set targets to be monitored by Prometheus. Let's create one:
+
+```yaml
+# service-monitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
 metadata:
+  name: prometheus
   labels:
-    app: grafana
-  name: grafana
+    name: prometheus
 spec:
   selector:
     matchLabels:
-      app: grafana
-  template:
-    metadata:
-      labels:
-        app: grafana
-    spec:
-      securityContext:
-        fsGroup: 472
-        supplementalGroups:
-          - 0
-      containers:
-        - name: grafana
-          image: grafana/grafana:9.1.0
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 3000
-              name: http-grafana
-              protocol: TCP
-          readinessProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /robots.txt
-              port: 3000
-              scheme: HTTP
-            initialDelaySeconds: 10
-            periodSeconds: 30
-            successThreshold: 1
-            timeoutSeconds: 2
-          livenessProbe:
-            failureThreshold: 3
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            successThreshold: 1
-            tcpSocket:
-              port: 3000
-            timeoutSeconds: 1
-          resources:
-            requests:
-              cpu: 250m
-              memory: 750Mi
-          volumeMounts:
-            - mountPath: /var/lib/grafana
-              name: grafana-pv
-      volumes:
-        - name: grafana-pv
-          persistentVolumeClaim:
-            claimName: grafana-pvc
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: grafana
-spec:
-  ports:
-    - port: 3000
-      protocol: TCP
-      targetPort: http-grafana
-  selector:
-    app: grafana
-  sessionAffinity: None
-  type: LoadBalancer
+      operated-prometheus: "true"
+  namespaceSelector:
+    any: true
+  endpoints:
+    - port: web
 ```
-
-Now follow these two simple steps:
-* Apply the file we just created: ``$ kubectl apply -f grafana.yaml``. 
-* Open its port so we can access through the browser: ``$ kubectl port-forward service/grafana 3000:3000``.
-* Use ``admin`` for both username and password.
-
-1. Create Namespace
-2. 
-
-#### **Visualize Cluster**
-
-
+This ServiceMonitor will look for namespaces with operated-prometheus in it and will scrap all important data and feed it into Prometheus.
 
 ### TODO: How to stress test (POST requests? Limit resources to a minimum)</br>
 
 https://github.com/markvincze/PrimeCalcApi/
 
-### TODO: Implementation on Cloud (Maybe)</br>
-### TODO: Write steps to develop inside container</br>
+### **Developing inside a container with VS Code**
+References:</br>
+[VS Code Documentation](https://code.visualstudio.com/docs/devcontainers/containers)</br>
+[Dev Containers Tutorial](https://code.visualstudio.com/docs/devcontainers/tutorial)
+
+To develop inside a running container you need the following:
+* Docker CE/EE edition running on your Linux Distro;
+* Install Visual Studio Code;
+* Install [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers);
+* Run VS Code click the following icon:
+
+![icon-image]()
+
+* Select "Create Dev Container..." and then you can select from a list of pre-built images.
 
 # References
 ## Docker
