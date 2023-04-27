@@ -78,6 +78,4 @@ typings/
 .fusebox/
 
 #DynamoDB Local files 
-.dynamodb/ 
-
-article_04/kube-prometheus
+.dynamodb/
