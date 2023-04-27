@@ -690,12 +690,13 @@ These steps are based on [this article](https://www.getambassador.io/resources/a
 #### **Install required CRDs (Custom Resource Definitions) & Deploy Prometheus Operator**
 First, we need to create something called [Prometheus Operator](https://www.tigera.io/learn/guides/prometheus-monitoring/prometheus-operator/). This operator will manage the Prometheus application and automate all configurations. RBAC is just the short for Role-based access control which is basically creating accounts with certain access levels (Very much what happens with Cloud Services).
 
-* Apply CRDs
-``$ kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/bundle.yaml
-``
-
-* Check if they were created
-* Check if Prometheus is running
+* Apply CRDs -- ``$ kubectl create -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/bundle.yaml``
+(Used ``create`` instead of ``apply`` because file was too large)
+* Check if CRDs were created (Needed later) -- ``$ kubectl get crds``
+* Check if Prometheus is running<br>
+``$ kubectl get deploy``<br>
+``$ kubectl get pods``<br>
+``$ kubectl get service``<br>
 
 #### **Install RBACs to allow monitoring**
 Now, we need to create accounts that will take the role of monitoring our application:
@@ -762,10 +763,10 @@ spec:
       memory: 400Mi
 ```
 
-Then apply it to the cluster as well:</br>
+Then apply it to the cluster as well:<br>
 ```$ kubectl apply -f prometheus.yaml```
 
-Make sure it's running and then port forward the app so we can reach through the browser:</br>
+Make sure it's running and then port forward the app so we can reach through the browser:<br>
 ```$ kubectl port-forward svc/prometheus-operated 9090:9090```
 
 [prometheus-ui]
