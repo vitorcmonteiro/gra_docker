@@ -677,125 +677,86 @@ Add some sharks and see that the results add up when you add a new one. Even if 
 <br>
 
 ### **Article 04 - Envoy**
-Envoy is a proxy/load balancing technology created at Lyft. There are several other options like NGINX, HAProxy, Zuul, Linkerd, Traefik, and Caddy (Go) [^8]. It's important to note that depending on the engine used in the cloud service this tutorial may not work.
+Envoy is a proxy/load balancing technology created at Lyft. There are several other options like NGINX, HAProxy, Zuul, Linkerd, Traefik, and Caddy (Go) [^8]. It's important to note that depending on the engine used in the cloud service this tutorial may not work. We don't necessarily need Envoy to make Kubernetes work, but the solution is broadly used by companies because it's much easier to manage the whole tech stack. Some of Envoy's features are:
 
 * Enable underlying pods to be accessed externally;
 * Used as a networking map, connecting the dots between ingress and services;
-* Treat incoming requests and adapts it to match underlying API's requirements, integrating them into one single app;
+* Treat incoming requests and adapts it to match underlying APIs, integrating them into one single access point;
 
-Remember that pods themselves are not open to the outside world. That's one of the strengths of Kubernetes (and Minikube). To connect from the outside we must use one of the two types of objects: [LoadBalancer](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/) or [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/).
+Remember that pods themselves are not open to the outside world. To connect from the outside we must use one of the two types of objects: [LoadBalancer](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/) or [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/).
 
-These steps are based on [this article](https://www.getambassador.io/resources/ambassador-prometheus) and it really helped me setup my Prometheus-Ambassador solution.
+* Activate Minikube Addons (Dashboard and Metrics Server)
+* Setup Prometheus
+* Setup Grafana
+* Create Flask App (API)
+* Stress Test
 
-#### **Install required CRDs (Custom Resource Definitions) & Deploy Prometheus Operator**
-First, we need to create something called [Prometheus Operator](https://www.tigera.io/learn/guides/prometheus-monitoring/prometheus-operator/). This operator will manage the Prometheus application and automate all configurations. RBAC is just the short for Role-based access control which is basically creating accounts with certain access levels (Very much what happens with Cloud Services).
+#### **Create Namespace**
+First, we need to create a new namespace within the cluster so that we isolate the whole monitoring app we are building from the application (That we will stress test):
 
-* Apply CRDs -- ``$ kubectl create -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/bundle.yaml``
-(Used ``create`` instead of ``apply`` because file was too large)
-* Check if CRDs were created (Needed later) -- ``$ kubectl get crds``
-* Check if Prometheus is running<br>
-``$ kubectl get deploy``<br>
-``$ kubectl get pods``<br>
-``$ kubectl get service``<br>
+```$ kubectl create namespace monitoring```
 
-#### **Install RBACs to allow monitoring**
-Now, we need to create accounts that will take the role of monitoring our application:
+#### **Activate Minikube Addons (Dashboard and Metrics Server)**
+Minikube has a built-in addon that creates a dashboard that we can use to monitor the usage of each pod. To enable it, we need to enable two features:
 
-```yaml
-# prom-rbac.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: prometheus
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: prometheus
-rules:
-- apiGroups: [""]
-  resources:
-  - nodes
-  - services
-  - endpoints
-  - pods
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources:
-  - configmaps
-  verbs: ["get"]
-- nonResourceURLs: ["/metrics"]
-  verbs: ["get"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: prometheus
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: prometheus
-subjects:
-- kind: ServiceAccount
-  name: prometheus
-  namespace: default
-```
+``$ minikube addons enable metrics-server`` and ``$ minikube addons enable dashboard``. After enabling all addons, we can start the dashboard by using the following command: ``$ minikube dashboard``.
 
-After creating the above file, apply it to our cluster:</br>
-``$ kubectl apply -f prom-rbac.yaml``
+[dashboad command result]
 
-#### **Deploy Prometheus instance**
-To create a Prometheus deployment we will use the following:
+#### **Setup Prometheus**
+Prometheus is a type of database that is natively supported by Kubernete's dashboard and we will use scrape Prometheu's data and pull it into a Grafana (Which also supports Prometheus). To configure Prometheus we need 4 YAML files:
 
-```yaml
-# prometheus.yaml
-apiVersion: monitoring.coreos.com/v1
-kind: Prometheus
-metadata:
-  name: prometheus
-spec:
-  serviceAccountName: prometheus
-  serviceMonitorSelector:
-    matchLabels:
-      ambassador: monitoring
-  resources:
-    requests:
-      memory: 400Mi
-```
+* ClusterRole - Creates a user account that will be used by the service.
+* ConfigMap - Will be used to create some baseline metrics (And we can add them here later instead of using the UI) that Prometheus will expose to other systems.
+* Deployment - Description about how Kubernetes will create the pod.
+* Service - The service that will "open" our pod to be accessed internally (Remember that we need Ingress or LoadBalancer to access it externally by default).
 
-Then apply it to the cluster as well:<br>
-```$ kubectl apply -f prometheus.yaml```
+For the sake of brevity, I'll just mention the files instead of listing their whole content here. Apply that configuration file to the cluster (Remember that after the "-f" portion we have to give it the whole path including the file): ```$ kubectl apply -f prometheus/ClusterRole.yaml --namespace=monitoring```.
 
-Make sure it's running and then port forward the app so we can reach through the browser:<br>
-```$ kubectl port-forward svc/prometheus-operated 9090:9090```
+Now we must apply the configurations that will be added when we deploy the pod: ```$ kubectl apply -f prometheus/ConfigMap.yaml --namespace=monitoring```.
+
+Next, we start deploying the application: ```$ kubectl apply -f prometheus/Deployment.yaml --namespace=monitoring```.
+
+Finally, we create the service: ```$ kubectl apply -f prometheus/Service.yaml --namespace=monitoring```.
+
+We could also write the namespace inside the files to avoid using the --namespace option. This is also recommended by [Google Cloud](https://cloud.google.com/blog/products/containers-kubernetes/kubernetes-best-practices-organizing-with-namespaces). I kept the original solution I used although it requires more typing.
+
+After applying these steps, we expect to see Prometheus pod running:
+
+```$ kubectl get pods``` (Look for Prometheu's pod name)
+
+[prometheus-pod]
+
+```$ kubectl port-forward pods/<prometheus pod name> 9090:9090 -n monitoring```
+
+Now you can access that pod via web browser (Local Windows).
 
 [prometheus-ui]
 
-#### **Configure ServiceMonitor**
-These CRDs are used to set targets to be monitored by Prometheus. Let's create one:
+#### **Setup Grafana**
+Grafana is a software that processes data from multiple sources and enables us to create web-based dashboards, including some presets made by Grafana's community. We need three resources to setup a Grafana instance (Deployment, Service, ConfigMap).
 
-```yaml
-# service-monitor.yaml
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: prometheus
-  labels:
-    name: prometheus
-spec:
-  selector:
-    matchLabels:
-      operated-prometheus: "true"
-  namespaceSelector:
-    any: true
-  endpoints:
-    - port: web
-```
-This ServiceMonitor will look for namespaces with operated-prometheus in it and will scrap all important data and feed it into Prometheus.
+```$ kubectl apply -f grafana/grafana-datasource-config.yaml --namespace=monitoring```
+```$ kubectl apply -f grafana/service.yaml --namespace=monitoring```
+```$ kubectl apply -f grafana/deployment.yaml --namespace=monitoring```
 
-### TODO: How to stress test (POST requests? Limit resources to a minimum)</br>
+After all resources were applied, we must again port forward from WSL2 to our Local Windows:
 
-https://github.com/markvincze/PrimeCalcApi/
+```$ kubectl port-forward services/<grafana service name> 3000:3000 -n monitoring```
+
+[grafana-port-forward]
+
+Now login with username and password "admin". Since we created one ConfigMap with a data source, it came configured in our instance, matching grafana-datasource-config.yaml:
+
+[grafana-data-source]
+
+#### **Create Flask App (API)**
+Now we have ways to monitor an API when we start sending a lot of requests. Our app is just a simple Flask app that will return either a random name or random license plate using Faker (Python Package). This applet will run within 3 sets of pods managed by Kubernetes. I've created a docker image that contains this applet.
+
+```$ kubectl create -f api/deployment.yaml --namespace=default```
+
+#### **Stress Test**
+To test this whole tech stack and monitor the resource usage I've developed another applet that will fire multithreaded requests towards Kubernetes and then it will route to some underlying Flask Pod.
 
 ### **Developing inside a container with VS Code**
 References:</br>
@@ -860,3 +821,6 @@ https://www.redhat.com/sysadmin/kubernetes-pods-communicate-nodes<br>
 
 https://observability.thomasriley.co.uk/prometheus/deploying-prometheus/launch-prometheus-instance/
 https://docs.openshift.com/container-platform/3.11/rest_api/rbac_authorization_k8s_io/clusterrole-rbac-authorization-k8s-io-v1.html#clusterrole-rbac-authorization-k8s-io-v1
+
+https://devopscube.com/setup-prometheus-monitoring-on-kubernetes/
+https://www.getambassador.io/resources/ambassador-prometheus

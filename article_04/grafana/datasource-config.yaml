@@ -9,12 +9,12 @@ data:
         "apiVersion": 1,
         "datasources": [
             {
-               "access":"proxy",
+               "access": "proxy",
                 "editable": true,
-                "name": "prometheus",
+                "name": "kube-state-metrics",
                 "orgId": 1,
                 "type": "prometheus",
-                "url": "http://prometheus-service.monitoring.svc:9090",
+                "url": "http://kube-state-metrics.kube-system.svc.cluster.local:8080/metrics",
                 "version": 1
             }
         ]
